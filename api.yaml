@@ -1,0 +1,50 @@
+openapi: "3.0.1"
+info:
+  title: HTTP API to Step Function execution
+paths:
+  /:
+    post:
+      responses:
+        default:
+          description: Execution Response
+      x-amazon-apigateway-integration:
+        integrationSubtype: "StepFunctions-StartExecution"
+        credentials:
+          Fn::GetAtt: [HttpSfnsInvocationRole, Arn]
+        requestParameters:
+          StateMachineArn:
+            Fn::GetAtt: [APIMachine, Arn]
+          Input: "$request.body"
+        payloadFormatVersion: "1.0"
+        type: aws_proxy
+        connectionType: INTERNET
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Task"
+
+components:
+  schemas:
+    Task:
+      type: object
+      properties:
+        schedule:
+          type: string
+        name:
+          type: string
+
+x-amazon-apigateway-cors:
+  allowMethods:
+    - "*"
+  maxAge: 0
+  allowCredentials: false
+  allowOrigins:
+    - "*"
+  allowHeaders:
+    - POST
+    - PUT
+    - OPTIONS
+    - GET
+    - PATCH
+x-amazon-apigateway-importexport-version: "1.0"

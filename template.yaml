@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: wojtek-sls-sfns
+
+Globals:
+  Function:
+    Timeout: 5
+    Handler: main
+    Runtime: go1.x
+    Tracing: Active
+
+Resources:
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  APIMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: machine.asl.json
+      # Service Role
+      Role: !GetAtt MachineRole.Arn
+      DefinitionSubstitutions:
+        # These indicate operations
+        DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
+        DDBDeleteItem: !Sub arn:${AWS::Partition}:states:::dynamodb:deleteItem
+        TableName: !Ref DataTable
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DefinitionBody:
+        "Fn::Transform":
+          Name: "AWS::Include"
+          Parameters:
+            Location: "./api.yaml"
+
+  # Service Role
+  HttpSfnsInvocationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: APIGWServiceRoleToInvokeStepFunction
+          PolicyDocument:
+            Statement:
+              Action:
+                - states:StartExecution
+              Effect: Allow
+              Resource:
+                - !GetAtt APIMachine.Arn
+
+  MachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub states.${AWS::Region}.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowDDBPut
+          PolicyDocument:
+            Statement:
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt DataTable.Arn
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"

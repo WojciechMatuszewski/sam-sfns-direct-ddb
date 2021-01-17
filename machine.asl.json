@@ -1,0 +1,44 @@
+{
+  "StartAt": "SaveToDB",
+  "States": {
+    "SaveToDB": {
+      "Type": "Task",
+      "Resource": "${DDBPutItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Item": {
+          "id": {
+            "S.$": "$$.Execution.Id"
+          },
+          "schedule": {
+            "S.$": "$.schedule"
+          },
+          "name": {
+            "S.$": "$.name"
+          }
+        }
+      },
+      "ResultPath": null,
+      "OutputPath": "$.schedule",
+      "Next": "WaitForTask"
+    },
+    "WaitForTask": {
+      "Type": "Wait",
+      "TimestampPath": "$",
+      "Next": "DeleteFromTable"
+    },
+    "DeleteFromTable": {
+      "Type": "Task",
+      "Resource": "${DDBDeleteItem}",
+      "Parameters": {
+        "TableName": "${TableName}",
+        "Key": {
+          "id": {
+            "S.$": "$$.Execution.Id"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}
